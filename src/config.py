@@ -26,7 +26,7 @@ PRETEST_END = pd.Timestamp("2026-03-31")
 TEST_START = pd.Timestamp("2026-04-01")
 TEST_END = pd.Timestamp("2026-09-30")
 CONTROL_START = pd.Timestamp("2026-10-16")
-CONTROL_END = None  # last complete day available, set after the download
+CONTROL_END = pd.Timestamp("2026-11-08")  # last complete day of the download (01_download.ipynb)
 
 TEST_DAYS = pd.date_range(TEST_START, TEST_END, freq="D")
 assert len(TEST_DAYS) == 183
