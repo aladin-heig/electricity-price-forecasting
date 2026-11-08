@@ -1,0 +1,34 @@
+# Secrets
+.env
+
+# ENTSO-E data: never republished (download code is versioned for reproducibility)
+data/*
+!data/.gitkeep
+
+# Forecasts: contain the actual prices (y_true)
+results/*
+!results/.gitkeep
+
+# Foundation model weights and caches
+checkpoints/
+.cache/
+hf_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

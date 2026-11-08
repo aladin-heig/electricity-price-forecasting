@@ -1,0 +1,36 @@
+[project]
+name = "electricity-price-forecasting"
+version = "0.1.0"
+description = "Day-ahead electricity spot price forecasting (DE-LU): classical statistical models vs zero-shot foundation models"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Aladin" }, { name = "Léon" }]
+dependencies = [
+    "pandas>=2.2",
+    "numpy",
+    "pyarrow",
+    "entsoe-py",
+    "holidays",
+    "statsmodels>=0.14",
+    "scipy",
+    "matplotlib",
+    "python-dotenv",
+    "jupyterlab",
+    "ipykernel",
+]
+
+[project.optional-dependencies]
+# To be filled in after reading the official TimesFM 3 and Timestral documentation
+# (CUDA torch, inference packages). If the two conflict: separate environments.
+foundation = []
+
+[dependency-groups]
+dev = ["nbstripout"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["src"]
