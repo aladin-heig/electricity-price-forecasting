@@ -130,7 +130,7 @@ Rules for SARIMA/SARIMAX:
 
 Common parameters:
 - Context: **2,048 hours** (≈ 85 days) of prices for both models, horizon 24.
-- With covariates: `load_fc`, `wind_fc`, `solar_fc` and the calendar, as past covariates (over the context) and known future covariates (over the 24 h of D). In both APIs this is a single **known-future covariate** array covering context + horizon (2,048 + 24 = 2,072 steps), one row per covariate; the past-only covariate inputs are not used.
+- With covariates: **the same exogenous variables as SARIMAX** (`load_fc`, `wind_fc`, `solar_fc`, `non_working_day`), so that a column of the two-way table compares families with the same information. `hour` and `dow` are not passed: the models learn the daily and weekly cycles from the 2,048 h context, as SARIMA does through its seasonal structure (this also avoids an encoding choice that only Timestral supports). In both APIs the covariates are a single **known-future covariate** array covering context + horizon (2,048 + 24 = 2,072 steps), one row per covariate; the past-only covariate inputs are not used.
 - Retrieve the point forecast (the median, quantile 0.5) and the quantiles.
 - Device: TimesFM 3 picks CUDA by itself when `device=None`, but Timestral defaults to CPU. Pass `device="cuda" if torch.cuda.is_available() else "cpu"` to both.
 - Smoke test on the RTX 3070 (context 2,048, horizon 24, one series, 4 covariates): TimesFM 3 ≈ 155 ms per forecast, peak VRAM ≈ 1.3 GB; Timestral-209M ≈ 50 ms univariate / ≈ 90 ms with covariates, peak VRAM ≈ 0.85 GB.
@@ -187,13 +187,14 @@ For both: the APIs above were checked against the installed packages (source and
   - **rMAE** = model MAE / reference naive MAE (< 1: better than the naive);
   - RMSE;
   - mean **pinball loss** for the probabilistic models (TimesFM 3, Timestral), computed on the quantile levels common to both (10th … 90th percentile; check that Timestral provides these levels, otherwise interpolate and document it).
-- **Diebold-Mariano test** between pairs of models (function available in `epftoolbox`), in particular: each model with covariates against its version without, and the best foundation model against SARIMAX.
+- **Diebold-Mariano test** between pairs of models, in particular: each model with covariates against its version without, and the best foundation model against SARIMAX.
 - **Detailed analyses**:
   - error by hour of day;
   - working vs non-working days;
   - high vs low wind forecast days (e.g. quartiles of daily mean `wind_fc`);
   - behaviour on spikes and on negative-price hours;
   - covariate gain compared across families (SARIMA → SARIMAX vs TimesFM → TimesFM + cov. vs Timestral → Timestral + cov.).
+- **Diebold-Mariano implementation**: the multivariate version used by `epftoolbox` (loss differential on the daily vector of 24 errors), reimplemented in `src/evaluation.py` with attribution (Apache-2.0). `epftoolbox` is not a project dependency, because it pulls TensorFlow and Keras into the environment shared with torch; the reimplementation is checked once against `epftoolbox.evaluation.DM` in a temporary environment.
 - **Contamination test**: TimesFM 3 and Timestral were released during or after the main test period; their pre-training data might contain these prices. Read their model cards (cutoff date, training data) and compare the rMAE of all models on the control period. A foundation model clearly better on the main test than on the control period, while the other models are stable, is a contamination signal.
 
 ## 8. Code structure

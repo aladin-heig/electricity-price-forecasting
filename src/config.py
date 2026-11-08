@@ -35,7 +35,8 @@ assert len(TEST_DAYS) == 183
 TARGET = "price"
 COVARIATES = ["load_fc", "wind_fc", "solar_fc"]
 CALENDAR = ["hour", "dow", "non_working_day"]
-SARIMAX_EXOG = ["load_fc", "wind_fc", "solar_fc", "non_working_day"]
+# Exogenous variables for SARIMAX and for the foundation models with covariates (same information)
+EXOG = ["load_fc", "wind_fc", "solar_fc", "non_working_day"]
 
 # Task
 HORIZON = 24  # 24 hourly prices of day D

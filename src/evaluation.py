@@ -42,3 +42,13 @@ def rmae(y_true, y_pred, y_naive) -> float:
 def pinball(y_true, quantiles: pd.DataFrame) -> float:
     """Mean pinball loss over the 10th … 90th percentile levels."""
     raise NotImplementedError
+
+
+def diebold_mariano(errors_a: pd.DataFrame, errors_b: pd.DataFrame, norm: int = 1) -> float:
+    """One-sided multivariate Diebold-Mariano test (H1: model B is more accurate than model A).
+
+    Errors are (days, 24) arrays; the loss differential is computed on the daily vector of
+    24 errors. Reimplementation of `epftoolbox.evaluation.DM` (Apache-2.0, Lago et al. 2021).
+    Returns the p-value.
+    """
+    raise NotImplementedError
