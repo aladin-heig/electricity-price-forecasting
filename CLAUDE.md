@@ -73,8 +73,18 @@ Everything is downloaded with the Python package `entsoe-py` (API token availabl
 | Day-ahead wind onshore + offshore forecast | Forecast, sum both into a single `wind_fc` series | MW → GW |
 | Day-ahead solar forecast | Forecast | MW → GW |
 
-- Check the exact method names and parameters in the `entsoe-py` documentation (do not guess).
-- Use the **day-ahead process type** for wind/solar forecasts (not intraday).
+Confirmed methods (`entsoe-py` 0.8.1, `EntsoePandasClient(api_key=...)`, zone `"DE_LU"`, `start`/`end` as tz-aware `pd.Timestamp`; smoke-tested on 2026-11-07):
+
+| Series | Method | Returns |
+|---|---|---|
+| Price | `query_day_ahead_prices(country_code, start, end)` | `pd.Series` (unnamed), EUR/MWh |
+| Load forecast | `query_load_forecast(country_code, start, end, process_type="A01")` | `DataFrame`, column `Forecasted Load`, MW |
+| Wind and solar forecasts | `query_wind_and_solar_forecast(country_code, start, end, psr_type=None, process_type="A01")` | `DataFrame`, columns `Solar`, `Wind Offshore`, `Wind Onshore`, MW |
+
+- `process_type="A01"` is **Day ahead** (the default for both forecast methods; `A40` is intraday). Pass it explicitly. `psr_type` can restrict to one source (`B16` solar, `B18` wind offshore, `B19` wind onshore); the call without `psr_type` returns all three columns at once.
+- All three are returned at **15-minute resolution** for recent dates, with the index in **`Europe/Berlin`** (the zone's local time, not UTC). Convert to UTC before the hourly aggregation (see Preprocessing). For prices, `entsoe-py` returns hourly values before 2025-10-01 and 15-minute values after.
+- `query_day_ahead_prices` **includes** the `end` timestamp (97 points for one day); the two forecast methods exclude it (96 points). Drop the extra point and deduplicate when concatenating chunks.
+- Long requests are split automatically by the library (year chunks for prices, month chunks for wind/solar).
 - **Energy-Charts** (Fraunhofer ISE, https://api.energy-charts.info/, no registration) is used only as a spot check: compare a few days of prices to validate the ENTSO-E download.
 
 ### Calendar
@@ -120,23 +130,53 @@ Rules for SARIMA/SARIMAX:
 
 Common parameters:
 - Context: **2,048 hours** (≈ 85 days) of prices for both models, horizon 24.
-- With covariates: `load_fc`, `wind_fc`, `solar_fc` and the calendar, as past covariates (over the context) and known future covariates (over the 24 h of D).
-- Retrieve the point forecast and the quantiles.
+- With covariates: `load_fc`, `wind_fc`, `solar_fc` and the calendar, as past covariates (over the context) and known future covariates (over the 24 h of D). In both APIs this is a single **known-future covariate** array covering context + horizon (2,048 + 24 = 2,072 steps), one row per covariate; the past-only covariate inputs are not used.
+- Retrieve the point forecast (the median, quantile 0.5) and the quantiles.
+- Device: TimesFM 3 picks CUDA by itself when `device=None`, but Timestral defaults to CPU. Pass `device="cuda" if torch.cuda.is_available() else "cpu"` to both.
+- Smoke test on the RTX 3070 (context 2,048, horizon 24, one series, 4 covariates): TimesFM 3 ≈ 155 ms per forecast, peak VRAM ≈ 1.3 GB; Timestral-209M ≈ 50 ms univariate / ≈ 90 ms with covariates, peak VRAM ≈ 0.85 GB.
 
 TimesFM 3:
 - Google Research, released 31 August 2026. Code: GitHub repository `google-research/timesfm`. Weights: Hugging Face `google/timesfm-3.0-pytorch`.
 - Non-commercial, non-production weight licence: fine for this academic project.
 - Native support for past and known future covariates. Quantiles from the 10th to the 90th percentile.
-- Package `timesfm` 3.0.2 on PyPI. The README examples use `TimesFM3Evaluator` from `timesfm3`, while the installed `timesfm` package exposes `TimesFM3Forecaster`: check which one is current before writing code.
+- Package `timesfm` 3.0.2 on PyPI (the code lives in the `timesfm3` module; `timesfm.TimesFM3Forecaster` is the same object).
+- **Use `TimesFM3Forecaster`**, not `TimesFM3Evaluator`. The evaluator is a benchmark subclass whose defaults are `make_positive=True` (clips at 0 when the context is non-negative) and `use_symmetric_averaging=True`; the forecaster's defaults are `False` for both, which keeps negative forecasts possible.
+- Loading: `TimesFM3Forecaster.from_pretrained("google/timesfm-3.0-pytorch", device=device)` (331M parameters).
+- Forecast:
+  ```python
+  out = model.predict(
+      context,                       # np.ndarray (2048,), float32, prices
+      horizon=24,
+      past_future_covariates=cov,    # np.ndarray (n_cov, 2048 + 24): covariates over context + day D
+      return_quantiles=True,         # default False: must be set
+  )                                  # -> ForecastOutput
+  out.forecast                       # np.ndarray (24,): median
+  out.quantiles                      # np.ndarray (24, 9): levels model.config.quantiles = [0.1, ..., 0.9]
+  ```
+  Univariate: omit `past_future_covariates`. `past_only_covariates` has shape `(n_cov, 2048)`. `predict_batch(contexts=[...], ...)` takes lists and returns an iterator of `ForecastOutput`. Outputs are NumPy arrays.
 
 Timestral:
 - Mistral AI, released 15 October 2026. Sizes 5M, 28M, 123M, 209M: use **the largest (209M)**.
 - Weights on Hugging Face (modified MIT licence), inference code on GitHub (Apache-2.0). Find Mistral's official repositories; do not guess the identifiers.
 - Announced: past and known future covariates, context up to 32,768 steps, 21 quantiles (0.01, 0.05, 0.10 … 0.90 by 0.05, 0.95, 0.99, so the 10th … 90th percentiles are included). The announced performance has not been independently verified yet.
 - Installed from git (`mistralai/timestral`, version 1.0.0). The model card gives no training data description or cutoff date.
-- **`forecast()` clips forecasts to non-negative values by default (`clip_nonnegative=True`). Always pass `clip_nonnegative=False`: negative prices are real values.** This is the only deviation from default parameters.
+- **`forecast()` clips forecasts to non-negative values by default (`clip_nonnegative=True`). Always pass `clip_nonnegative=False`: negative prices are real values.** This is the only deviation from default parameters. (The clip applies only when the whole observed context is ≥ 0, which can happen on an 85-day window; the smoke test confirmed that the lower quantiles go from negative to 0 when it is left on.)
+- Loading: `TimestralForecaster.from_pretrained("mistralai/Timestral-209M", device=device)`. The default device is `"cpu"`, so pass it explicitly.
+- Forecast:
+  ```python
+  fc = model.forecast(
+      context[None, None],           # (B=1, V=1, 2048): series, variates, time; NaN = missing
+      prediction_length=24,
+      known_covariates=cov[None],    # (B=1, n_cov, 2048 + 24): covariates over context + day D
+      clip_nonnegative=False,
+  )                                  # -> Forecast
+  fc.quantiles                       # torch.Tensor (1, 1, 24, 21) on the model device
+  fc.quantile_levels                 # (0.01, 0.05, 0.1, 0.15, ..., 0.9, 0.95, 0.99)
+  fc.median                          # (1, 1, 24); fc.quantile(0.1) -> (1, 1, 24)
+  ```
+  Univariate: omit `known_covariates`. `past_covariates` has shape `(B, n_cov, 2048)`. Known covariate rows whose values are all 0 or 1 (e.g. `non_working_day`) are treated as indicators. Outputs are torch tensors: call `.cpu().numpy()`. The deciles 0.1 … 0.9 are exact levels of the 21 (indices 2, 4, …, 18), so no interpolation is needed for the pinball loss.
 
-For both: **do not guess the API**. Read the official README and examples (covariate format, checkpoint loading, outputs) before writing code. This information comes from a web search: confirm it in the official documentation.
+For both: the APIs above were checked against the installed packages (source and README) and a smoke test on synthetic data. Do not use other signatures without checking the installed source.
 
 ## 7. Evaluation protocol
 
