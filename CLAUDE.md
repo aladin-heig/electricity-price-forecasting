@@ -8,7 +8,7 @@ Brief for an agent that generates the notebooks of this project. Read it in full
 - Team: Aladin and Léon.
 - Final presentation around **24 November 2026**.
 - Expectation: do something clean and draw conclusions from it. No strict grading rubric. Favour protocol rigour over sophistication.
-- Hardware: two machines. Development machine without an NVIDIA GPU; a second machine with an NVIDIA RTX 3070 (8 GB VRAM) runs the foundation models. Code must pick the device at runtime (`cuda` if available, else `cpu`), never hard-code it. Compute time is not a hard constraint.
+- Hardware: development happens on two machines, kept in sync through GitHub: one without an NVIDIA GPU, one with an NVIDIA RTX 3070 (8 GB VRAM) that runs the foundation model evaluations. Code must pick the device at runtime (`cuda` if available, else `cpu`), never hard-code it. `data/` and `results/` are not versioned and must be copied between machines when needed. Compute time is not a hard constraint.
 - Reuse the tools and vocabulary of the course (see section 9).
 
 ## 2. The business problem
