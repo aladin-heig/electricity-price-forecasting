@@ -8,7 +8,7 @@ Brief for an agent that generates the notebooks of this project. Read it in full
 - Team: Aladin and Léon.
 - Final presentation around **24 November 2026**.
 - Expectation: do something clean and draw conclusions from it. No strict grading rubric. Favour protocol rigour over sophistication.
-- Hardware: local PC with an NVIDIA RTX 3070 GPU (8 GB VRAM), Python. Compute time is not a hard constraint.
+- Hardware: two machines. Development machine without an NVIDIA GPU; a second machine with an NVIDIA RTX 3070 (8 GB VRAM) runs the foundation models. Code must pick the device at runtime (`cuda` if available, else `cpu`), never hard-code it. Compute time is not a hard constraint.
 - Reuse the tools and vocabulary of the course (see section 9).
 
 ## 2. The business problem
@@ -127,11 +127,14 @@ TimesFM 3:
 - Google Research, released 31 August 2026. Code: GitHub repository `google-research/timesfm`. Weights: Hugging Face `google/timesfm-3.0-pytorch`.
 - Non-commercial, non-production weight licence: fine for this academic project.
 - Native support for past and known future covariates. Quantiles from the 10th to the 90th percentile.
+- Package `timesfm` 3.0.2 on PyPI. The README examples use `TimesFM3Evaluator` from `timesfm3`, while the installed `timesfm` package exposes `TimesFM3Forecaster`: check which one is current before writing code.
 
 Timestral:
 - Mistral AI, released 15 October 2026. Sizes 5M, 28M, 123M, 209M: use **the largest (209M)**.
 - Weights on Hugging Face (modified MIT licence), inference code on GitHub (Apache-2.0). Find Mistral's official repositories; do not guess the identifiers.
-- Announced: past and known future covariates, context up to 32,768 steps, 21 quantiles. The announced performance has not been independently verified yet.
+- Announced: past and known future covariates, context up to 32,768 steps, 21 quantiles (0.01, 0.05, 0.10 … 0.90 by 0.05, 0.95, 0.99, so the 10th … 90th percentiles are included). The announced performance has not been independently verified yet.
+- Installed from git (`mistralai/timestral`, version 1.0.0). The model card gives no training data description or cutoff date.
+- **`forecast()` clips forecasts to non-negative values by default (`clip_nonnegative=True`). Always pass `clip_nonnegative=False`: negative prices are real values.** This is the only deviation from default parameters.
 
 For both: **do not guess the API**. Read the official README and examples (covariate format, checkpoint loading, outputs) before writing code. This information comes from a web search: confirm it in the official documentation.
 

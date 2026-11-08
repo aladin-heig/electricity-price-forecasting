@@ -18,12 +18,11 @@ dependencies = [
     "python-dotenv",
     "jupyterlab",
     "ipykernel",
+    # Foundation models (Linux PyPI torch wheels ship with CUDA)
+    "torch>=2.4",
+    "timesfm[torch]>=3.0",
+    "timestral @ git+https://github.com/mistralai/timestral.git",
 ]
-
-[project.optional-dependencies]
-# To be filled in after reading the official TimesFM 3 and Timestral documentation
-# (CUDA torch, inference packages). If the two conflict: separate environments.
-foundation = []
 
 [dependency-groups]
 dev = ["nbstripout"]
